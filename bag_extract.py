@@ -1,13 +1,13 @@
 import rosbag
 import csv
 
+
 def ros_msg_to_dict(msg, parent_key=''):
     """
     Convert a ROS message to a dictionary with nested fields flattened.
     :param msg: The ROS message object.
     :param parent_key: The base key for nested fields (used for recursion).
     :return: A dictionary representation of the message.
-    THE CORE OF THIS FUNCTION WAS BUILT BY ChatGPT
     """
     msg_dict = {}
 
@@ -48,24 +48,26 @@ def collect_all_field_names(bag, topics):
     for topic, msg, t in bag.read_messages(topics=topics):
         if topic not in covered_topics:
             msg_dict = ros_msg_to_dict(msg, parent_key=topic)
-            field_names.update(msg_dict.keys())
+            field_names.update(msg_dict.keys()) # we only need the keys
             covered_topics.add(topic)
 
-        if covered_topics == topics_set:  # Compare with the pre-made set
+        if covered_topics == topics_set:  
             break
 
     return sorted(field_names)
 
 
 if __name__ == '__main__':
-    bag = rosbag.Bag('test.bag')
-    topics = list(bag.get_type_and_topic_info()[1].keys())
+    input_filename = 'test.bag'
+    interval = 0.5 
 
-    interval = 0.5 # should be inputted as argument to script
-    next_interval_time = bag.get_start_time() + interval 
+    bag = rosbag.Bag(input_filename)
+    topics = list(bag.get_type_and_topic_info()[1].keys())
 
     most_recent_messages = {} # empty dict, values of this dict will also be dicts
     output_data = {} # empty dict
+
+    next_interval_time = bag.get_start_time() + interval 
 
     for topic, msg, t in bag.read_messages(topics=topics):
         if t.to_sec() <= next_interval_time:
@@ -76,8 +78,14 @@ if __name__ == '__main__':
             output_data[str(t.to_sec())] = combined_dict
             next_interval_time += interval
 
-#    output_file = 'output.csv'
-#    with open(output_file, 'w') as file:
-#        field_names = collect_all_field_names(bag, topics)
+    output_file = 'output.csv'
+    with open(output_file, 'w') as file:
+        fieldnames = collect_all_field_names(bag, topics)
+
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for k, v in output_data.items():
+            writer.writerow(v)
 
     bag.close()
