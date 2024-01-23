@@ -6,10 +6,10 @@ import sys
 import cv2
 from cv_bridge import CvBridge
 from utils import create_img_directories, directoryname_from_topic, filename_from_msg, get_img_topics
+from arg_parsing import parser
 
 IMG_MSG_TYPES = ['sensor_msgs/Image', 'sensor_msgs/CompressedImage']
 CV_BRIDGE = CvBridge()
-
 
 def ros_img_to_dict(msg, topic):
     """
@@ -39,6 +39,7 @@ def ros_msg_to_dict(msg, parent_key=''):
     """
     Convert a ROS message to a dictionary with nested fields flattened.
     The parent_key parameter is the base of the key for (nested) fields.
+    NOTE certain ROS messages that have list fields make problems
     """
     msg_dict = {}
         
@@ -85,6 +86,7 @@ def collect_all_field_names(bag, topics):
 
 
 if __name__ == '__main__':
+    parser.parse_args()
     real_bag = 'ts_2022_08_04_15h23m08s_one_row.bag'
     test_bag = 'test.bag'
     time_to_analyze = 100
