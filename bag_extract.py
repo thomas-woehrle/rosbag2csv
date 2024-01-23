@@ -5,8 +5,10 @@ import rosbag
 import sys
 import cv2
 import datetime
+from cv_bridge import CvBridge
 
 IMG_MSG_TYPES = ['sensor_msgs/Image', 'sensor_msgs/CompressedImage']
+CV_BRIDGE = CvBridge()
 
 def find_first_of_substrings(string, substrings):
     for substring in substrings:
@@ -56,25 +58,27 @@ def create_img_directories(topics):
 
         try:
             os.makedirs(path, exist_ok=True)
-            print(f"Directory '{path}' created")
         except OSError as error:
             print(f"Error: {error}")
 
 
 def ros_img_to_dict(msg, topic):
-    # TODO different handling for depth topics...
     msg_dict = {} # empty dict
 
     fn = filename_from_msg(msg)
     dn = directoryname_from_topic(topic)
+    out_path = os.path.join(dn, fn + '.png')
 
-    np_arr = np.frombuffer(msg.data, np.uint8)
-    cvimg = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    out_fn = os.path.join(dn, fn + '.png')
-    print(out_fn)
-    cv2.imwrite(out_fn, cvimg) # overwrites image, if already existing
+    if msg._type == 'sensor_msgs/Image':
+        cvimg = CV_BRIDGE.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+        cv2.imwrite(out_path, cvimg)
+
+    elif msg._type == 'sensor_msgs/CompressedImage':
+        np_arr = np.frombuffer(msg.data, np.uint8)
+        cvimg = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        cv2.imwrite(out_path, cvimg) # overwrites image, if already existing
+
     msg_dict[dn] = fn
-
     return msg_dict
 
 
@@ -149,7 +153,7 @@ if __name__ == '__main__':
 
     bag = rosbag.Bag(input_file)
     all_topics = list(bag.get_type_and_topic_info()[1].keys())
-    topics = ['/terrasentia/imu', '/terrasentia/zed2/zed_node/left/image_rect_color/compressed']
+    topics = ['/terrasentia/zed2/zed_node/left/image_rect_color/compressed', '/terrasentia/zed2/zed_node/depth/depth_registered']
     bag_start_time = bag.get_start_time()
 
     img_topics = get_img_topics(bag, topics)
