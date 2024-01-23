@@ -4,65 +4,18 @@ import os
 import rosbag
 import sys
 import cv2
-import datetime
 from cv_bridge import CvBridge
+from utils import create_img_directories, directoryname_from_topic, filename_from_msg, get_img_topics
 
 IMG_MSG_TYPES = ['sensor_msgs/Image', 'sensor_msgs/CompressedImage']
 CV_BRIDGE = CvBridge()
 
-def find_first_of_substrings(string, substrings):
-    for substring in substrings:
-        index = string.find(substring)
-        if index != -1:
-            return index
-    return -1
-
-
-def filename_from_msg(msg):
-    t = msg.header.stamp.to_sec()
-    dt_object = datetime.datetime.fromtimestamp(t) # turn into datetime object
-    formatted_stamp = dt_object.strftime("%Y%m%d-%H%M%S") # format to year,month,day,hour,minute,second
-    return f"{formatted_stamp}-{str(t)[11:15]}" # add non-decimal part of seconds at the end 
-
-
-def get_img_topics(bag, topics):
-    img_topics = set()
-    covered_topics = set()
-    all_topics = set(topics)
-
-    for topic, msg, t in bag.read_messages(topics=topics):
-        if msg._type in IMG_MSG_TYPES:
-            img_topics.add(topic)
-        covered_topics.add(topic)
-
-        if covered_topics == all_topics:
-            break
-
-    return list(img_topics)
-
-
-def directoryname_from_topic(topic):
-    dn = topic.replace('/', '--')
-
-    # try to find the a suitable directory name:
-    idx = find_first_of_substrings(dn, ['left', 'right', 'center', 'depth'])
-    if idx != -1:
-        dn = dn[idx:]
-
-    return dn
-
-
-def create_img_directories(topics):
-    for topic in topics:
-        path = directoryname_from_topic(topic)
-
-        try:
-            os.makedirs(path, exist_ok=True)
-        except OSError as error:
-            print(f"Error: {error}")
-
 
 def ros_img_to_dict(msg, topic):
+    """
+    Save file of picture of inputted ROS msg and return a dictionary with one key-value pair.
+    The key is the folder_name, the value is the filename of the picture of the inputted msg.
+    """
     msg_dict = {} # empty dict
 
     fn = filename_from_msg(msg)
@@ -100,17 +53,6 @@ def ros_msg_to_dict(msg, parent_key=''):
             # Recursively process the nested message
             nested_dict = ros_msg_to_dict(field_value, parent_key=new_key)
             msg_dict.update(nested_dict)
-            """
-        # IMPORTANT: handling some lists does not work right now
-        # reason for this is: number_of_list_elements is variable, but number of csv columns isn't
-        elif isinstance(field_value, list):  # It's a list, could be primitives or messages
-            for i, item in enumerate(field_value):
-                item_key = f"{new_key}[{i}]"
-                if hasattr(item, "__slots__"):  # Nested message in list
-                    nested_dict = ros_msg_to_dict(item, parent_key=item_key)
-                    msg_dict.update(nested_dict)
-                else:  # Primitive type in list
-                    msg_dict[item_key] = item"""
         else:  # Primitive type
             msg_dict[new_key] = field_value
 
@@ -145,18 +87,19 @@ def collect_all_field_names(bag, topics):
 if __name__ == '__main__':
     real_bag = 'ts_2022_08_04_15h23m08s_one_row.bag'
     test_bag = 'test.bag'
-    time_to_analyze = 2
+    time_to_analyze = 100
 
     input_file = real_bag
     output_file = 'output.csv'
-    interval = 0.5
+    interval = 10
 
     bag = rosbag.Bag(input_file)
     all_topics = list(bag.get_type_and_topic_info()[1].keys())
-    topics = ['/terrasentia/zed2/zed_node/left/image_rect_color/compressed', '/terrasentia/zed2/zed_node/depth/depth_registered']
+    # topics = ['/terrasentia/zed2/zed_node/left/image_rect_color/compressed', '/terrasentia/zed2/zed_node/depth/depth_registered']
+    topics = ['/terrasentia/ekf']
     bag_start_time = bag.get_start_time()
 
-    img_topics = get_img_topics(bag, topics)
+    img_topics = get_img_topics(bag, topics, IMG_MSG_TYPES)
     if img_topics:
         create_img_directories(img_topics)
 
