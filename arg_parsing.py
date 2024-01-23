@@ -9,5 +9,5 @@ parser.add_argument('interval', type=float, help='The interval with which extrac
 parser.add_argument('topics', help='The topics that should be processed on the rosbag file. Can be supplied via multiple command line arguments, a json file, or a mixture of both. Write "all" to include all topics.')
 
 parser.add_argument('-o', '--out-dir', metavar='', dest='output_directory', default='./', help='The path to the output directory. The directory has to exist already. (Default: the current directory)')
-parser.add_argument('-s', '--start', metavar='', type=float, default=0, help='The startpoint of extraction inside the rosbag-file in seconds from the beginning of the rosbag-file. (Default: 0)')
-parser.add_argument('-l', '--length', metavar='', help='The lenght of the extraction period in seconds. (Default: Until end of rosbag-file)')
+parser.add_argument('-d', '--delay', metavar='', type=float, default=0, help='The number of seconds from the beginning of the rosbag-file that the extraction should be delayed by. (Default: 0)')
+parser.add_argument('-l', '--length', metavar='', type=float, help='The length of the extraction period in seconds. (Default: Until end of rosbag-file)')
