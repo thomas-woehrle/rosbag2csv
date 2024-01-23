@@ -17,13 +17,10 @@ def find_first_of_substrings(string, substrings):
 
 
 def filename_from_msg(msg):
-    stamp = msg.header.stamp
-    timestamp = stamp.to_sec() # get timestamp as float
-    nanoseconds = stamp.to_nsec()
-    print(timestamp)
-    dt_object = datetime.datetime.fromtimestamp(timestamp) # turn into datetime object
+    t = msg.header.stamp.to_sec()
+    dt_object = datetime.datetime.fromtimestamp(t) # turn into datetime object
     formatted_stamp = dt_object.strftime("%Y%m%d-%H%M%S") # format to year,month,day,hour,minute,second
-    return f"{formatted_stamp}-{nanoseconds:09d}" # add padded nanoseconds at the end TODO cut of first digits
+    return f"{formatted_stamp}-{str(t)[11:15]}" # add non-decimal part of seconds at the end 
 
 
 def get_img_topics(bag, topics):
@@ -164,10 +161,7 @@ if __name__ == '__main__':
 
     next_interval_time = bag_start_time + interval 
 
-    counter = 0
     for topic, msg, t in bag.read_messages(topics=topics):
-        print(counter)
-        counter += 1
         t = t.to_sec()
         if t >= bag_start_time + time_to_analyze:
             break
