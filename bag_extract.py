@@ -4,7 +4,6 @@ import os
 import rosbag
 import sys
 import cv2
-import rospy
 import datetime
 
 IMG_MSG_TYPES = ['sensor_msgs/Image', 'sensor_msgs/CompressedImage']
@@ -18,27 +17,13 @@ def find_first_of_substrings(string, substrings):
 
 
 def filename_from_msg(msg):
-    timestamp = msg.header.stamp.to_sec() # get timestamp as float
+    stamp = msg.header.stamp
+    timestamp = stamp.to_sec() # get timestamp as float
+    nanoseconds = stamp.to_nsec()
     print(timestamp)
     dt_object = datetime.datetime.fromtimestamp(timestamp) # turn into datetime object
-    return dt_object.strftime("%Y%m%d-%H%M%S") # format
-
-
-def ros_img_to_dict(msg, topic):
-    # TODO different handling for depth topics...
-    msg_dict = {} # empty dict
-
-    fn = filename_from_msg(msg)
-    dn = directoryname_from_topic(topic)
-
-    np_arr = np.frombuffer(msg.data, np.uint8)
-    cvimg = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    out_fn = os.path.join(dn, fn + '.png')
-    print(out_fn)
-    cv2.imwrite(out_fn, cvimg) # overwrites image, if already existing
-    msg_dict[dn] = fn
-
-    return msg_dict
+    formatted_stamp = dt_object.strftime("%Y%m%d-%H%M%S") # format to year,month,day,hour,minute,second
+    return f"{formatted_stamp}-{nanoseconds:09d}" # add padded nanoseconds at the end TODO cut of first digits
 
 
 def get_img_topics(bag, topics):
@@ -79,16 +64,28 @@ def create_img_directories(topics):
             print(f"Error: {error}")
 
 
+def ros_img_to_dict(msg, topic):
+    # TODO different handling for depth topics...
+    msg_dict = {} # empty dict
+
+    fn = filename_from_msg(msg)
+    dn = directoryname_from_topic(topic)
+
+    np_arr = np.frombuffer(msg.data, np.uint8)
+    cvimg = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    out_fn = os.path.join(dn, fn + '.png')
+    print(out_fn)
+    cv2.imwrite(out_fn, cvimg) # overwrites image, if already existing
+    msg_dict[dn] = fn
+
+    return msg_dict
+
+
 def ros_msg_to_dict(msg, parent_key=''):
     """
     Convert a ROS message to a dictionary with nested fields flattened.
     The parent_key parameter is the base of the key for (nested) fields.
     """
-    print('####')
-    print(type(msg))
-    print(msg)
-    print(msg.__slots__)
-    print('####')
     msg_dict = {}
         
     # Iterate over all fields in the message
@@ -131,7 +128,8 @@ def collect_all_field_names(bag, topics):
     for topic, msg, t in bag.read_messages(topics=topics):
         if topic not in covered_topics:   
             if msg._type in IMG_MSG_TYPES:
-                msg_dict = ros_img_to_dict(msg, topic)   
+                # next line means that there will be an image which ist not referenced in the .csv file, but that is okay
+                msg_dict = ros_img_to_dict(msg, topic) 
             else:
                 msg_dict = ros_msg_to_dict(msg, parent_key=topic)
             field_names.update(msg_dict.keys()) # we only need the keys
@@ -146,7 +144,7 @@ def collect_all_field_names(bag, topics):
 if __name__ == '__main__':
     real_bag = 'ts_2022_08_04_15h23m08s_one_row.bag'
     test_bag = 'test.bag'
-    time_to_analyze = 1
+    time_to_analyze = 2
 
     input_file = real_bag
     output_file = 'output.csv'
@@ -159,25 +157,30 @@ if __name__ == '__main__':
 
     img_topics = get_img_topics(bag, topics)
     if img_topics:
-        print(img_topics)
         create_img_directories(img_topics)
 
-    most_recent_messages = {} # empty dict, values of this dict will also be dicts
+    most_recent_messages = {} # empty dict, values of this dict will eventually also be dicts
     output_data = [] # empty array
 
     next_interval_time = bag_start_time + interval 
 
+    counter = 0
     for topic, msg, t in bag.read_messages(topics=topics):
+        print(counter)
+        counter += 1
         t = t.to_sec()
         if t >= bag_start_time + time_to_analyze:
             break
 
         if t <= next_interval_time:
-            if msg._type in IMG_MSG_TYPES:
-                most_recent_messages[topic] = ros_img_to_dict(msg, topic)
-            else:
-                most_recent_messages[topic] = ros_msg_to_dict(msg, parent_key=topic)
+            most_recent_messages[topic] = msg
         else:
+            # turn the messages into dictionaries
+            for topic, msg in most_recent_messages.items():
+                if msg._type in IMG_MSG_TYPES:
+                    most_recent_messages[topic] = ros_img_to_dict(msg, topic)
+                else:
+                    most_recent_messages[topic] = ros_msg_to_dict(msg, parent_key=topic)
             # combine the dictionaries into a single dictionary 
             combined_dict = {k: v for d in most_recent_messages.values() for k, v in d.items()} 
             output_data.append(combined_dict)
