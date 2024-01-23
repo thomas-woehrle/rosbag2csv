@@ -86,20 +86,19 @@ def collect_all_field_names(bag, topics):
 
 
 if __name__ == '__main__':
-    parser.parse_args()
-    real_bag = 'ts_2022_08_04_15h23m08s_one_row.bag'
-    test_bag = 'test.bag'
-    time_to_analyze = 100
+    args = parser.parse_args()
 
-    input_file = real_bag
-    output_file = 'output.csv'
-    interval = 10
+    input_file = args.input_filepath
+    interval = args.interval
+    topics = ['/terrasentia/ekf']
+    output_file = os.path.join(args.output_directory, 'rosbag.csv')
+    extraction_delay = args.delay
+    length_of_extraction = args.length
 
     bag = rosbag.Bag(input_file)
     all_topics = list(bag.get_type_and_topic_info()[1].keys())
-    # topics = ['/terrasentia/zed2/zed_node/left/image_rect_color/compressed', '/terrasentia/zed2/zed_node/depth/depth_registered']
-    topics = ['/terrasentia/ekf']
-    bag_start_time = bag.get_start_time()
+    bag_start_time = bag.get_start_time() + extraction_delay 
+    bag_end_time = bag_start_time + length_of_extraction if length_of_extraction else bag.get_end_time() 
 
     img_topics = get_img_topics(bag, topics, IMG_MSG_TYPES)
     if img_topics:
@@ -108,16 +107,24 @@ if __name__ == '__main__':
     most_recent_messages = {} # empty dict, values of this dict will eventually also be dicts
     output_data = [] # empty array
 
+    print(bag_start_time)
+    print(bag_end_time)
+    print('--')
     next_interval_time = bag_start_time + interval 
+    print(next_interval_time)
 
     for topic, msg, t in bag.read_messages(topics=topics):
         t = t.to_sec()
-        if t >= bag_start_time + time_to_analyze:
+        if t >= bag_end_time:
+            print(t)
+            print('nit', next_interval_time)
             break
 
         if t <= next_interval_time:
             most_recent_messages[topic] = msg
         else:
+            print(next_interval_time)
+            print(t)
             # turn the messages into dictionaries
             for topic, msg in most_recent_messages.items():
                 if msg._type in IMG_MSG_TYPES:
