@@ -7,6 +7,15 @@ import cv2
 import rospy
 import datetime
 
+
+def find_first_of_substrings(string, substrings):
+    for substring in substrings:
+        index = string.find(substring)
+        if index != -1:
+            return index
+    return -1
+
+
 def filename_from_msg(msg):
     timestamp = msg.header.stamp.to_sec() # get timestamp as float
     print(timestamp)
@@ -14,11 +23,51 @@ def filename_from_msg(msg):
     return dt_object.strftime("%Y%m%d-%H%M%S") # format
 
 
+def ros_img_to_dict(msg):
+    pass
+
+
+def get_img_topics(bag, topics):
+    img_topics = set()
+    covered_topics = set()
+    all_topics = set(topics)
+
+    for topic, msg, t in bag.read_messages(topics=topics):
+        if msg._type == 'sensor_msgs/CompressedImage':
+            img_topics.add(topic)
+        covered_topics.add(topic)
+
+        if covered_topics == all_topics:
+            break
+
+    return list(img_topics)
+
+
+def create_img_directories(topics):
+    for topic in topics:
+        path = topic.replace('/', '--')
+        # try to find the a suitable directory name:
+        idx = find_first_of_substrings(path, ['left', 'right', 'center', 'depth'])
+        if idx != -1:
+            path = path[idx:]
+
+        try:
+            os.makedirs(path, exist_ok=True)
+            print(f"Directory '{path}' created")
+        except OSError as error:
+            print(f"Error: {error}")
+
+
 def ros_msg_to_dict(msg, parent_key=''):
     """
     Convert a ROS message to a dictionary with nested fields flattened.
     The parent_key parameter is the base of the key for (nested) fields.
     """
+    print('####')
+    print(type(msg))
+    print(msg)
+    print(msg.__slots__)
+    print('####')
     msg_dict = {}
     
     # should be refactored into separate function
@@ -72,15 +121,15 @@ def collect_all_field_names(bag, topics):
     """
     field_names = set()
     covered_topics = set()
-    topics_set = set(topics)
+    all_topics = set(topics)
 
     for topic, msg, t in bag.read_messages(topics=topics):
-        if topic not in covered_topics:
+        if topic not in covered_topics:        
             msg_dict = ros_msg_to_dict(msg, parent_key=topic)
             field_names.update(msg_dict.keys()) # we only need the keys
             covered_topics.add(topic)
 
-        if covered_topics == topics_set:  
+        if covered_topics == all_topics:  
             break
 
     return sorted(field_names)
@@ -93,12 +142,17 @@ if __name__ == '__main__':
 
     input_file = real_bag
     output_file = 'output.csv'
-    interval = 0.5
+    interval = 1
 
     bag = rosbag.Bag(input_file)
     all_topics = list(bag.get_type_and_topic_info()[1].keys())
-    topics = ['/terrasentia/full_gps', '/terrasentia/imu']
+    topics = ['/terrasentia/imu', '/terrasentia/zed2/zed_node/left/image_rect_color/compressed']
     bag_start_time = bag.get_start_time()
+
+    img_topics = get_img_topics(bag, topics)
+    if img_topics:
+        print(img_topics)
+        create_img_directories(img_topics)
 
     most_recent_messages = {} # empty dict, values of this dict will also be dicts
     output_data = [] # empty array
