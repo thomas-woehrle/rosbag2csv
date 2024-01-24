@@ -4,6 +4,7 @@ import os
 import rosbag
 import sys
 import cv2
+import json
 from cv_bridge import CvBridge
 from utils import create_img_directories, directoryname_from_topic, filename_from_msg, get_img_topics
 from arg_parsing import parser
@@ -85,20 +86,37 @@ def collect_all_field_names(bag, topics):
     return sorted(field_names)
 
 
-if __name__ == '__main__':
-    args = parser.parse_args()
+def get_topics_from_arg(bag, arg_topics):
+    excluded_topics = ['/rosout', '/tf', '/tf_static']
+    topics = set()
+    for arg in arg_topics:
+        if arg == 'all':
+            new_topics = bag.get_type_and_topic_info()[1].keys()
+            type(new_topics)
+            topics.update(set(new_topics)) # all topics
+            break
+        elif arg.endswith('.json'):
+            try:
+                with open(arg, 'r') as file:
+                    new_topics = json.load(file)
+                    topics.update(set(new_topics))
+            except Exception:
+                print('Error while reading', arg)
+                print('Make sure to supply correct path.')
+                sys.exit(1)
+        else:
+            topics.add(arg)
+    
+    topics = list(topics)
+    topics = [topic for topic in topics if not topic in excluded_topics]
+    return sorted(topics)
+    
 
-    input_file = args.input_filepath
-    interval = args.interval
-    topics = ['/terrasentia/ekf']
-    output_file = os.path.join(args.output_directory, 'rosbag.csv')
-    extraction_delay = args.delay
-    length_of_extraction = args.length
-
+def main(input_file, interval, arg_topics, output_file, extraction_delay, length_of_extraction):
     bag = rosbag.Bag(input_file)
-    all_topics = list(bag.get_type_and_topic_info()[1].keys())
-    bag_start_time = bag.get_start_time() + extraction_delay 
-    bag_end_time = bag_start_time + length_of_extraction if length_of_extraction else bag.get_end_time() 
+    topics = get_topics_from_arg(bag, arg_topics)
+    extraction_start = bag.get_start_time() + extraction_delay 
+    extraction_end = extraction_start + length_of_extraction if length_of_extraction else bag.get_end_time() 
 
     img_topics = get_img_topics(bag, topics, IMG_MSG_TYPES)
     if img_topics:
@@ -107,24 +125,16 @@ if __name__ == '__main__':
     most_recent_messages = {} # empty dict, values of this dict will eventually also be dicts
     output_data = [] # empty array
 
-    print(bag_start_time)
-    print(bag_end_time)
-    print('--')
-    next_interval_time = bag_start_time + interval 
-    print(next_interval_time)
+    next_interval_time = extraction_start + interval 
 
     for topic, msg, t in bag.read_messages(topics=topics):
         t = t.to_sec()
-        if t >= bag_end_time:
-            print(t)
-            print('nit', next_interval_time)
+        if t >= extraction_end:
             break
 
         if t <= next_interval_time:
             most_recent_messages[topic] = msg
         else:
-            print(next_interval_time)
-            print(t)
             # turn the messages into dictionaries
             for topic, msg in most_recent_messages.items():
                 if msg._type in IMG_MSG_TYPES:
@@ -156,3 +166,15 @@ if __name__ == '__main__':
         bag.close()
 
     sys.exit(0)
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+
+    input_file = args.input_filepath
+    interval = args.interval
+    arg_topics = args.topics # the actual topics will be determined after the bag is opened
+    output_file = os.path.join(args.output_directory, 'rosbag.csv')
+    extraction_delay = args.delay
+    length_of_extraction = args.length
+
+    main(input_file, interval, arg_topics, output_file, extraction_delay, length_of_extraction)
