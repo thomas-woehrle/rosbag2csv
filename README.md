@@ -27,8 +27,7 @@ optional arguments:
                    (Default: 0)
   -l , --length    The length of the extraction period in seconds. (Default: Until end of rosbag-file)
 
-TIPS: The first second and the last (partially finished) interval are excluded. An empty output file could mean that you
-specified the topics wrongly
+NOTE: The first save takes place at <start_time> + <interval_time>. The last (partially finished) interval are excluded. An empty output file could mean that you specified the topics wrongly
 ```
 
 ## Acknowledgements
