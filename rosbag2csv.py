@@ -12,7 +12,7 @@ from arg_parsing import parser
 IMG_MSG_TYPES = ['sensor_msgs/Image', 'sensor_msgs/CompressedImage']
 CV_BRIDGE = CvBridge()
 
-def ros_img_to_dict(msg, topic):
+def ros_img_to_dict(msg, topic, output_directory):
     """
     Save file of picture of inputted ROS msg and return a dictionary with one key-value pair.
     The key is the folder_name, the value is the filename of the picture of the inputted msg.
@@ -21,7 +21,7 @@ def ros_img_to_dict(msg, topic):
 
     fn = filename_from_msg(msg)
     dn = directoryname_from_topic(topic)
-    out_path = os.path.join(dn, fn + '.png')
+    out_path = os.path.join(output_directory, dn, fn + '.png')
 
     if msg._type == 'sensor_msgs/Image':
         cvimg = CV_BRIDGE.imgmsg_to_cv2(msg, desired_encoding='passthrough')
@@ -30,7 +30,7 @@ def ros_img_to_dict(msg, topic):
     elif msg._type == 'sensor_msgs/CompressedImage':
         np_arr = np.frombuffer(msg.data, np.uint8)
         cvimg = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        cv2.imwrite(out_path, cvimg) # overwrites image, if already existing
+        cv2.imwrite(out_path, cvimg) # overwrites image, if already existing. Does nothing if directory non-existant
 
     msg_dict[dn] = fn
     return msg_dict
@@ -73,8 +73,8 @@ def collect_all_field_names(bag, topics):
     for topic, msg, t in bag.read_messages(topics=topics):
         if topic not in covered_topics:   
             if msg._type in IMG_MSG_TYPES:
-                # next line means that there will be an image which ist not referenced in the .csv file, but that is okay
-                msg_dict = ros_img_to_dict(msg, topic) 
+                # specifying a non-existant directory means that no image will be saved in ros_img_to_dict()
+                msg_dict = ros_img_to_dict(msg, topic, './can_be_deleted', ) 
             else:
                 msg_dict = ros_msg_to_dict(msg, parent_key=topic)
             field_names.update(msg_dict.keys()) # we only need the keys
@@ -112,7 +112,7 @@ def get_topics_from_arg(bag, arg_topics):
     return sorted(topics)
     
 
-def main(input_file, interval, arg_topics, output_file, extraction_delay, length_of_extraction):
+def main(input_file, interval, arg_topics, output_directory, output_file, extraction_delay, length_of_extraction):
     bag = rosbag.Bag(input_file)
     topics = get_topics_from_arg(bag, arg_topics)
     extraction_start = bag.get_start_time() + extraction_delay 
@@ -120,7 +120,7 @@ def main(input_file, interval, arg_topics, output_file, extraction_delay, length
 
     img_topics = get_img_topics(bag, topics, IMG_MSG_TYPES)
     if img_topics:
-        create_img_directories(img_topics)
+        create_img_directories(output_directory, img_topics)
 
     most_recent_messages = {} # empty dict, values of this dict will eventually also be dicts
     output_data = [] # empty array
@@ -138,7 +138,7 @@ def main(input_file, interval, arg_topics, output_file, extraction_delay, length
             # turn the messages into dictionaries
             for topic, msg in most_recent_messages.items():
                 if msg._type in IMG_MSG_TYPES:
-                    most_recent_messages[topic] = ros_img_to_dict(msg, topic)
+                    most_recent_messages[topic] = ros_img_to_dict(msg, topic, output_directory)
                 else:
                     most_recent_messages[topic] = ros_msg_to_dict(msg, parent_key=topic)
             # combine the dictionaries into a single dictionary 
@@ -173,8 +173,9 @@ if __name__ == '__main__':
     input_file = args.input_filepath
     interval = args.interval
     arg_topics = args.topics # the actual topics will be determined after the bag is opened
-    output_file = os.path.join(args.output_directory, 'rosbag.csv')
+    output_directory = args.output_directory # should have default like './'
+    output_file = os.path.join(output_directory, 'rosbag.csv')
     extraction_delay = args.delay
     length_of_extraction = args.length
 
-    main(input_file, interval, arg_topics, output_file, extraction_delay, length_of_extraction)
+    main(input_file, interval, arg_topics, output_directory, output_file, extraction_delay, length_of_extraction)

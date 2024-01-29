@@ -1,9 +1,9 @@
 import datetime
 import os
 
-def create_img_directories(topics):
+def create_img_directories(output_directory, topics):
     for topic in topics:
-        path = directoryname_from_topic(topic)
+        path = os.path.join(output_directory, directoryname_from_topic(topic))
 
         try:
             os.makedirs(path, exist_ok=True)
