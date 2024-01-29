@@ -102,7 +102,7 @@ def get_topics_from_arg(bag, arg_topics):
                     topics.update(set(new_topics))
             except Exception:
                 print('Error while reading', arg)
-                print('Make sure to supply correct path.')
+                print('Make sure to supply correct path and well formatted file(only one array).')
                 sys.exit(1)
         else:
             topics.add(arg)
