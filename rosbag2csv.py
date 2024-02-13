@@ -19,9 +19,9 @@ def ros_img_to_dict(msg, topic, output_directory):
     """
     msg_dict = {} # empty dict
 
-    fn = filename_from_msg(msg)
+    fn = filename_from_msg(msg) + '.png'
     dn = directoryname_from_topic(topic)
-    out_path = os.path.join(output_directory, dn, fn + '.png')
+    out_path = os.path.join(output_directory, dn, fn)
 
     if msg._type == 'sensor_msgs/Image':
         cvimg = CV_BRIDGE.imgmsg_to_cv2(msg, desired_encoding='passthrough')
@@ -128,6 +128,16 @@ def main(input_file, interval, arg_topics, output_directory, output_file, extrac
     next_interval_time = extraction_start + interval 
 
     for topic, msg, t in bag.read_messages(topics=topics):
+        if False:
+            if msg._type == 'sensor_msgs/CameraInfo':
+                print('D: ', msg.D)
+                print('K: ', msg.K)
+                print('R: ', msg.R)
+                print('P: ', msg.P)
+                return
+            else: 
+                continue
+        ###
         t = t.to_sec()
         if t >= extraction_end:
             break
@@ -174,6 +184,7 @@ if __name__ == '__main__':
     interval = args.interval
     arg_topics = args.topics # the actual topics will be determined after the bag is opened
     output_directory = args.output_directory # should have default like './'
+    os.makedirs(output_directory, exist_ok=True)
     output_file = os.path.join(output_directory, 'rosbag.csv')
     extraction_delay = args.delay
     length_of_extraction = args.length
