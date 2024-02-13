@@ -21,7 +21,7 @@ positional arguments:
 
 optional arguments:
   -h, --help       show this help message and exit
-  -o , --out-dir   The path to the output directory. The directory has to exist already. (Default: the current
+  -o , --out-dir   The path to the output directory. (Default: the current
                    directory)
   -d , --delay     The number of seconds from the beginning of the rosbag-file that the extraction should be delayed by.
                    (Default: 0)
