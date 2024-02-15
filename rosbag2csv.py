@@ -12,12 +12,13 @@ from arg_parsing import parser
 IMG_MSG_TYPES = ['sensor_msgs/Image', 'sensor_msgs/CompressedImage']
 CV_BRIDGE = CvBridge()
 
+
 def ros_img_to_dict(msg, topic, output_directory):
     """
     Save file of picture of inputted ROS msg and return a dictionary with one key-value pair.
     The key is the folder_name, the value is the filename of the picture of the inputted msg.
     """
-    msg_dict = {} # empty dict
+    msg_dict = {}  # empty dict
 
     fn = filename_from_msg(msg) + '.png'
     dn = directoryname_from_topic(topic)
@@ -30,7 +31,8 @@ def ros_img_to_dict(msg, topic, output_directory):
     elif msg._type == 'sensor_msgs/CompressedImage':
         np_arr = np.frombuffer(msg.data, np.uint8)
         cvimg = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        cv2.imwrite(out_path, cvimg) # overwrites image, if already existing. Does nothing if directory non-existant
+        # overwrites image, if already existing. Does nothing if directory non-existant
+        cv2.imwrite(out_path, cvimg)
 
     msg_dict[dn] = fn
     return msg_dict
@@ -43,7 +45,7 @@ def ros_msg_to_dict(msg, parent_key=''):
     NOTE certain ROS messages that have list fields make problems
     """
     msg_dict = {}
-        
+
     # Iterate over all fields in the message
     for field_name in msg.__slots__:
         field_value = getattr(msg, field_name)
@@ -71,16 +73,16 @@ def collect_all_field_names(bag, topics):
     all_topics = set(topics)
 
     for topic, msg, t in bag.read_messages(topics=topics):
-        if topic not in covered_topics:   
+        if topic not in covered_topics:
             if msg._type in IMG_MSG_TYPES:
                 # specifying a non-existant directory means that no image will be saved in ros_img_to_dict()
-                msg_dict = ros_img_to_dict(msg, topic, './can_be_deleted', ) 
+                msg_dict = ros_img_to_dict(msg, topic, './can_be_deleted', )
             else:
                 msg_dict = ros_msg_to_dict(msg, parent_key=topic)
-            field_names.update(msg_dict.keys()) # we only need the keys
+            field_names.update(msg_dict.keys())  # we only need the keys
             covered_topics.add(topic)
 
-        if covered_topics == all_topics:  
+        if covered_topics == all_topics:
             break
 
     return sorted(field_names)
@@ -93,7 +95,7 @@ def get_topics_from_arg(bag, arg_topics):
         if arg == 'all':
             new_topics = bag.get_type_and_topic_info()[1].keys()
             type(new_topics)
-            topics.update(set(new_topics)) # all topics
+            topics.update(set(new_topics))  # all topics
             break
         elif arg.endswith('.json'):
             try:
@@ -102,40 +104,59 @@ def get_topics_from_arg(bag, arg_topics):
                     topics.update(set(new_topics))
             except Exception:
                 print('Error while reading', arg)
-                print('Make sure to supply correct path and well formatted file(only one array).')
+                print(
+                    'Make sure to supply correct path and well formatted file(only one array).')
                 sys.exit(1)
         else:
             topics.add(arg)
-    
+
     topics = list(topics)
     topics = [topic for topic in topics if not topic in excluded_topics]
     return sorted(topics)
-    
+
 
 def main(input_file, interval, arg_topics, output_directory, output_file, extraction_delay, length_of_extraction):
+    print('################################################################')
+    print('Starting to process',  os.path.abspath(input_file), '...')
     bag = rosbag.Bag(input_file)
     topics = get_topics_from_arg(bag, arg_topics)
-    extraction_start = bag.get_start_time() + extraction_delay 
-    extraction_end = extraction_start + length_of_extraction if length_of_extraction else bag.get_end_time() 
+    extraction_start = bag.get_start_time() + extraction_delay
+    extraction_end = extraction_start + \
+        length_of_extraction if length_of_extraction else bag.get_end_time()
 
     img_topics = get_img_topics(bag, topics, IMG_MSG_TYPES)
     if img_topics:
         create_img_directories(output_directory, img_topics)
 
-    most_recent_messages = {} # empty dict, values of this dict will eventually also be dicts
-    output_data = [] # empty array
+    # empty dict, values of this dict will eventually also be dicts
+    most_recent_messages = {}
+    output_data = []  # empty array
 
-    next_interval_time = extraction_start + interval 
+    next_interval_time = extraction_start + interval
 
+    old_d = None
+    old_k = None
+    old_r = None
+    old_p = None
     for topic, msg, t in bag.read_messages(topics=topics):
         if False:
             if msg._type == 'sensor_msgs/CameraInfo':
-                print('D: ', msg.D)
-                print('K: ', msg.K)
-                print('R: ', msg.R)
-                print('P: ', msg.P)
+                print(msg.K)
                 return
-            else: 
+                if old_d:
+                    assert old_d == msg.D
+                    assert old_k == msg.K
+                    assert old_r == msg.R
+                    assert old_p == msg.P
+                old_d = msg.D
+                old_k = msg.K
+                old_r = msg.R
+                old_p = msg.P
+                print(msg.D)
+                print(msg.K)
+                print(msg.R)
+                print(msg.P)
+            else:
                 continue
         ###
         t = t.to_sec()
@@ -148,11 +169,14 @@ def main(input_file, interval, arg_topics, output_directory, output_file, extrac
             # turn the messages into dictionaries
             for topic, msg in most_recent_messages.items():
                 if msg._type in IMG_MSG_TYPES:
-                    most_recent_messages[topic] = ros_img_to_dict(msg, topic, output_directory)
+                    most_recent_messages[topic] = ros_img_to_dict(
+                        msg, topic, output_directory)
                 else:
-                    most_recent_messages[topic] = ros_msg_to_dict(msg, parent_key=topic)
-            # combine the dictionaries into a single dictionary 
-            combined_dict = {k: v for d in most_recent_messages.values() for k, v in d.items()} 
+                    most_recent_messages[topic] = ros_msg_to_dict(
+                        msg, parent_key=topic)
+            # combine the dictionaries into a single dictionary
+            combined_dict = {k: v for d in most_recent_messages.values()
+                             for k, v in d.items()}
             output_data.append(combined_dict)
             next_interval_time += interval
 
@@ -172,21 +196,26 @@ def main(input_file, interval, arg_topics, output_directory, output_file, extrac
                     print('------')
                     print("Try removing topics where the msgs have lists as fields")
                     sys.exit(1)
-    finally: 
+    finally:
         bag.close()
 
+    print('Finished processing:', input_file)
+    print('Results at:', os.path.abspath(output_directory))
+    print('################################################################')
     sys.exit(0)
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
     input_file = args.input_filepath
     interval = args.interval
-    arg_topics = args.topics # the actual topics will be determined after the bag is opened
-    output_directory = args.output_directory # should have default like './'
+    arg_topics = args.topics  # the actual topics will be determined after the bag is opened
+    output_directory = args.output_directory  # should have default like './'
     os.makedirs(output_directory, exist_ok=True)
     output_file = os.path.join(output_directory, 'rosbag.csv')
     extraction_delay = args.delay
     length_of_extraction = args.length
 
-    main(input_file, interval, arg_topics, output_directory, output_file, extraction_delay, length_of_extraction)
+    main(input_file, interval, arg_topics, output_directory,
+         output_file, extraction_delay, length_of_extraction)

@@ -1,6 +1,7 @@
 import datetime
 import os
 
+
 def create_img_directories(output_directory, topics):
     for topic in topics:
         path = os.path.join(output_directory, directoryname_from_topic(topic))
@@ -32,9 +33,11 @@ def find_first_of_substrings(string, substrings):
 
 def filename_from_msg(msg):
     t = msg.header.stamp.to_sec()
-    dt_object = datetime.datetime.fromtimestamp(t) # turn into datetime object
-    formatted_stamp = dt_object.strftime("%Y%m%d-%H%M%S") # format to year,month,day,hour,minute,second
-    return f"{formatted_stamp}-{str(t)[11:15]}" # add non-decimal part of seconds at the end 
+    dt_object = datetime.datetime.fromtimestamp(t)  # turn into datetime object
+    # format to year,month,day,hour,minute,second
+    formatted_stamp = dt_object.strftime("%Y%m%d-%H%M%S")
+    # add non-decimal part of seconds at the end
+    return f"{formatted_stamp}-{str(t)[11:15]}"
 
 
 def get_img_topics(bag, topics, img_topics_list):
