@@ -32,6 +32,8 @@ def find_first_of_substrings(string, substrings):
 
 
 def filename_from_msg(msg):
+    # TODO if milliseconds of timestampt not available, then this collapses all images
+    # within a second into one
     t = msg.header.stamp.to_sec()
     dt_object = datetime.datetime.fromtimestamp(t)  # turn into datetime object
     # format to year,month,day,hour,minute,second
