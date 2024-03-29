@@ -134,30 +134,7 @@ def main(input_file, interval, arg_topics, output_directory, output_file, extrac
 
     next_interval_time = extraction_start + interval
 
-    old_d = None
-    old_k = None
-    old_r = None
-    old_p = None
     for topic, msg, t in bag.read_messages(topics=topics):
-        if False:
-            if msg._type == 'sensor_msgs/CameraInfo':
-                print(msg.K)
-                return
-                if old_d:
-                    assert old_d == msg.D
-                    assert old_k == msg.K
-                    assert old_r == msg.R
-                    assert old_p == msg.P
-                old_d = msg.D
-                old_k = msg.K
-                old_r = msg.R
-                old_p = msg.P
-                print(msg.D)
-                print(msg.K)
-                print(msg.R)
-                print(msg.P)
-            else:
-                continue
         ###
         t = t.to_sec()
         if t >= extraction_end:
@@ -166,16 +143,18 @@ def main(input_file, interval, arg_topics, output_directory, output_file, extrac
         if t <= next_interval_time:
             most_recent_messages[topic] = msg
         else:
+            save_for_topic = {} 
+            # empty dict, this is what will be saved in the end
             # turn the messages into dictionaries
             for topic, msg in most_recent_messages.items():
                 if msg._type in IMG_MSG_TYPES:
-                    most_recent_messages[topic] = ros_img_to_dict(
+                    save_for_topic[topic] = ros_img_to_dict(
                         msg, topic, output_directory)
                 else:
-                    most_recent_messages[topic] = ros_msg_to_dict(
+                    save_for_topic[topic] = ros_msg_to_dict(
                         msg, parent_key=topic)
             # combine the dictionaries into a single dictionary
-            combined_dict = {k: v for d in most_recent_messages.values()
+            combined_dict = {k: v for d in save_for_topic.values()
                              for k, v in d.items()}
             output_data.append(combined_dict)
             next_interval_time += interval
